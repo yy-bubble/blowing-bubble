@@ -1,0 +1,1201 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>シャボン玉シミュレーター</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --panel: rgba(255, 255, 255, .76);
+      --ink: #1c2530;
+      --line: rgba(68, 111, 140, .2);
+      --accent: #48d2cf;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 12% 14%, rgba(151, 219, 114, .34), transparent 26%),
+        linear-gradient(135deg, #e8f7ff 0%, #f8fff2 48%, #fff7fb 100%);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+    }
+
+    .app {
+      width: min(100vw, calc(100vh * 1122 / 1402), 1122px);
+      aspect-ratio: 1122 / 1402;
+      position: relative;
+      overflow: hidden;
+      background: #dff3ff;
+      box-shadow: 0 26px 80px rgba(31, 71, 88, .24);
+    }
+
+    .scene,
+    .bubble-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .scene {
+      display: none;
+      object-fit: cover;
+      object-position: center center;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .bubble-canvas {
+      touch-action: none;
+    }
+
+    .controls {
+      position: absolute;
+      left: clamp(10px, 2.4vw, 22px);
+      right: clamp(10px, 2.4vw, 22px);
+      bottom: clamp(10px, 2.2vw, 20px);
+      display: grid;
+      gap: 7px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      backdrop-filter: blur(18px) saturate(1.25);
+      border-radius: 8px;
+      box-shadow: 0 18px 50px rgba(36, 68, 82, .2);
+    }
+
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: end;
+      min-width: 0;
+    }
+
+    .control-row.adjustments {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .control-group {
+      display: flex;
+      gap: 6px;
+      align-items: end;
+      min-width: 0;
+    }
+
+    .control-group.right {
+      justify-content: end;
+    }
+
+    .control-group label {
+      min-width: 0;
+    }
+
+    .control-row.adjustments label {
+      width: min(100%, 360px);
+    }
+
+    button {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 1px solid rgba(39, 111, 129, .24);
+      border-radius: 8px;
+      color: #15343c;
+      background: rgba(255, 255, 255, .82);
+      cursor: pointer;
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(37, 160, 166, .55);
+      background: white;
+    }
+
+    button svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    label {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0;
+      color: rgba(28, 37, 48, .82);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    input[type="number"] {
+      width: 74px;
+      min-width: 0;
+      height: 24px;
+      padding: 0 8px;
+      border: 1px solid rgba(39, 111, 129, .24);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .82);
+      color: var(--ink);
+      font: inherit;
+      font-weight: 700;
+    }
+
+    input[type="file"] {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .file-label {
+      align-self: end;
+    }
+
+    .file-button {
+      height: 34px;
+      min-width: 54px;
+      padding: 0 8px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(39, 111, 129, .24);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .82);
+      color: #15343c;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .recording {
+      border-color: rgba(235, 91, 126, .55);
+      color: #9c2441;
+      background: rgba(255, 238, 243, .9);
+    }
+
+    .download-link {
+      min-width: 64px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      padding: 0 9px;
+      border: 1px solid rgba(39, 111, 129, .24);
+      border-radius: 8px;
+      color: #15343c;
+      background: rgba(255, 255, 255, .82);
+      font-size: 11px;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    .download-link[hidden] {
+      display: none;
+    }
+
+    @media (max-width: 760px) {
+      body {
+        align-items: start;
+      }
+
+      .app {
+        width: 100vw;
+        height: 100dvh;
+        aspect-ratio: auto;
+      }
+
+      .scene {
+        object-position: center;
+      }
+
+      .controls {
+        gap: 7px;
+      }
+
+      .control-group,
+      .control-group.right {
+        justify-content: center;
+      }
+
+      .control-row {
+        gap: 6px;
+      }
+
+      .control-row.adjustments {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" id="app">
+    <img class="scene" id="scene" src="background.png" alt="">
+    <canvas class="bubble-canvas" id="bubble"></canvas>
+
+    <section class="controls" aria-label="シャボン玉設定">
+      <div class="control-row">
+        <div class="control-group">
+          <button id="toggle" type="button" aria-label="再生">
+            <svg id="playIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5-10-6.5Z"/></svg>
+          </button>
+          <button id="reset" type="button" aria-label="最初から再生">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a7 7 0 1 1-6.33 4H3l4-4 4 4H8.1A5 5 0 1 0 12 7V5Z"/></svg>
+          </button>
+          <button id="record" type="button" aria-label="録画開始">
+            <svg id="recordIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Zm10 3.2-3.2 2.8L17 14.8V9.2Z"/></svg>
+          </button>
+          <a id="downloadLink" class="download-link" hidden>保存</a>
+        </div>
+        <div class="control-group right">
+          <label>
+            パターン
+            <input id="seed" type="number" min="1" max="9999" value="184">
+          </label>
+          <label class="file-label">
+            <span class="file-button">画像1</span>
+            <input id="baseImage" type="file" accept="image/*">
+          </label>
+          <label class="file-label">
+            <span class="file-button">画像2</span>
+            <input id="contactImage" type="file" accept="image/*">
+          </label>
+        </div>
+      </div>
+
+      <div class="control-row adjustments">
+        <div class="control-group">
+          <label>
+            速度
+            <input id="speed" type="range" min="20" max="420" value="220">
+          </label>
+        </div>
+        <div class="control-group right">
+          <label>
+            彩度
+            <input id="saturation" type="range" min="0" max="180" value="88">
+          </label>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const app = document.querySelector("#app");
+    const scene = document.querySelector("#scene");
+    const canvas = document.querySelector("#bubble");
+    const ctx = canvas.getContext("2d");
+    const recordCanvas = document.createElement("canvas");
+    recordCanvas.width = 1122;
+    recordCanvas.height = 1402;
+    const recordCtx = recordCanvas.getContext("2d");
+    const controls = {
+      seed: document.querySelector("#seed"),
+      saturation: document.querySelector("#saturation"),
+      speed: document.querySelector("#speed"),
+      baseImage: document.querySelector("#baseImage"),
+      contactImage: document.querySelector("#contactImage"),
+      toggle: document.querySelector("#toggle"),
+      reset: document.querySelector("#reset"),
+      record: document.querySelector("#record"),
+      downloadLink: document.querySelector("#downloadLink"),
+      playIcon: document.querySelector("#playIcon"),
+      recordIcon: document.querySelector("#recordIcon"),
+    };
+    controls.seed.value = String(Math.floor(1 + Math.random() * 9999));
+
+    const source = new Image();
+    source.src = "background.png";
+    const contactSource = new Image();
+    contactSource.src = "contact-background.png";
+    const CONTACT_DURATION = 1400;
+    const CONTACT_IMAGE_FADE_DURATION = 1120;
+    const CONTACT_HOLD_DURATION = 5400;
+    const CONTACT_START_RATIO = .995;
+    const CONTACT_RADIUS_SCALE = 1.32;
+    const INSIDE_FADE_DURATION = 1400;
+    const STILL_DURATION = 2000;
+
+    const state = {
+      playing: false,
+      radius: 8,
+      lastTime: 0,
+      phase: 0,
+      hold: 0,
+      mode: "intro",
+      origin: { x: 552, y: 518 },
+      center: { x: 565, y: 694 },
+      recorder: null,
+      chunks: [],
+      gifFrames: [],
+      gifRecording: false,
+      lastGifFrame: 0,
+      contactRadius: 0,
+      downloadUrl: "",
+      baseObjectUrl: "",
+      contactObjectUrl: "",
+    };
+
+    function resize() {
+      const rect = app.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+      ctx.setTransform(dpr * rect.width / 1122, 0, 0, dpr * rect.height / 1402, 0, 0);
+      draw();
+    }
+
+    function setPlaying(next) {
+      state.playing = next;
+      controls.toggle.setAttribute("aria-label", next ? "一時停止" : "再生");
+      controls.playIcon.innerHTML = next
+        ? '<path d="M7 5h4v14H7V5Zm6 0h4v14h-4V5Z"/>'
+        : '<path d="M8 5.5v13l10-6.5-10-6.5Z"/>';
+      if (next) requestAnimationFrame(tick);
+    }
+
+    function reset() {
+      state.radius = 8;
+      state.phase = 0;
+      state.hold = 0;
+      state.mode = "intro";
+      state.lastTime = 0;
+      state.contactRadius = 0;
+      draw();
+    }
+
+    function coverRadius() {
+      const corners = [
+        [0, 0],
+        [1122, 0],
+        [0, 1402],
+        [1122, 1402],
+      ];
+      return Math.max(...corners.map(([x, y]) => Math.hypot(x - state.center.x, y - state.center.y))) + 34;
+    }
+
+    function bubbleCenter(radius) {
+      const max = coverRadius();
+      const t = Math.min(1, Math.max(0, radius / (max * .72)));
+      const ease = 1 - Math.pow(1 - t, 2.2);
+      return {
+        x: state.origin.x + (state.center.x - state.origin.x) * ease,
+        y: state.origin.y + (state.center.y - state.origin.y) * ease - Math.sin(state.phase * .9) * 5,
+      };
+    }
+
+    function seededNoise(n) {
+      const seed = Number(controls.seed.value) || 1;
+      const value = Math.sin(seed * 12.9898 + n * 78.233) * 43758.5453;
+      return value - Math.floor(value);
+    }
+
+    function hueBase(offset) {
+      const drift = state.phase * 34;
+      const pulse = Math.sin(state.phase * .82 + seededNoise(offset) * Math.PI * 2) * 32;
+      return seededNoise(offset + 17) * 360 + drift + pulse + offset;
+    }
+
+    function hsl(offset, alpha, light = 72) {
+      const hue = (hueBase(offset) + 360) % 360;
+      const sat = Number(controls.saturation.value);
+      return `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`;
+    }
+
+    function drawBackgroundLens(g, x, y, r, image = source, alpha = .2) {
+      if (!image.complete || r < 34) return;
+      g.save();
+      g.beginPath();
+      g.arc(x, y, r * .985, 0, Math.PI * 2);
+      g.clip();
+      g.globalAlpha = alpha;
+      const scale = 1.012;
+      g.translate(x, y);
+      g.scale(scale, scale);
+      drawCoverImage(g, image, -x - 4, -y + 8, 1122, 1402);
+      g.restore();
+    }
+
+    function drawCoverImage(g, image, dx = 0, dy = 0, dw = 1122, dh = 1402) {
+      if (!image.complete) return;
+      const iw = image.naturalWidth || image.width;
+      const ih = image.naturalHeight || image.height;
+      const sourceRatio = iw / ih;
+      const targetRatio = dw / dh;
+      let sx = 0;
+      let sy = 0;
+      let sw = iw;
+      let sh = ih;
+      if (sourceRatio > targetRatio) {
+        sw = ih * targetRatio;
+        sx = (iw - sw) / 2;
+      } else {
+        sh = iw / targetRatio;
+        sy = (ih - sh) / 2;
+      }
+      g.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
+    }
+
+    function sceneImageProgress() {
+      if (state.mode === "contact") return smoothstep(0, CONTACT_IMAGE_FADE_DURATION, state.hold);
+      if (state.mode === "burst" || state.mode === "clear") return 1;
+      return 0;
+    }
+
+    function drawSceneBackground(g) {
+      drawCoverImage(g, source);
+      const progress = sceneImageProgress();
+      if (progress > 0 && contactSource.complete) {
+        g.save();
+        g.globalAlpha = Math.min(.96, progress * .96);
+        drawCoverImage(g, contactSource);
+        g.restore();
+      }
+    }
+
+    function drawBubble(g) {
+      if (state.mode === "clear") return;
+      if (state.mode === "intro") return;
+      if (state.mode === "burst") {
+        drawBurst(g);
+        return;
+      }
+
+      const r = state.radius;
+      if (r < 5) return;
+
+      const { x, y } = bubbleCenter(r);
+      const inside = state.mode === "inside";
+      const contact = state.mode === "contact";
+      const max = coverRadius();
+      const growth = smoothstep(.12, .72, r / max);
+      const contactProgress = contact ? Math.min(1, state.hold / CONTACT_DURATION) : 0;
+      const contactImageProgress = contact ? smoothstep(0, CONTACT_IMAGE_FADE_DURATION, state.hold) : 0;
+      const wave = contact ? Math.sin(state.phase * 5.8) * (22 + contactProgress * 28) : 0;
+      const wobble = Math.sin(state.phase) * (1.2 + growth * 4.8) + wave * .24;
+
+      if (inside) {
+        const insideFade = smoothstep(0, INSIDE_FADE_DURATION, state.hold);
+        drawInsideEnvironment(g, insideFade);
+        drawBubbleHighlights(g, state.center.x, state.center.y, max * CONTACT_RADIUS_SCALE, 1, 1, insideFade);
+        return;
+      }
+
+      drawBackgroundLens(g, x, y, r, source, .2 * (1 - contactImageProgress));
+      if (contact) drawBackgroundLens(g, x, y, r, contactSource, .2 * contactImageProgress);
+
+      g.save();
+      g.globalCompositeOperation = "screen";
+
+      const fill = g.createRadialGradient(x - r * .3, y - r * .34, r * .08, x, y, r);
+      fill.addColorStop(0, "rgba(255,255,255,.22)");
+      fill.addColorStop(.18, hsl(18, .18, 76));
+      fill.addColorStop(.42, hsl(106, .23, 74));
+      fill.addColorStop(.68, hsl(-66, .2, 73));
+      fill.addColorStop(.9, hsl(178, .16, 78));
+      fill.addColorStop(1, "rgba(255,255,255,.08)");
+      g.beginPath();
+      g.arc(x, y, r, 0, Math.PI * 2);
+      g.fillStyle = fill;
+      g.fill();
+
+      const rim = g.createLinearGradient(x - r, y - r, x + r, y + r);
+      rim.addColorStop(0, hsl(112, .95, 74));
+      rim.addColorStop(.18, hsl(12, .9, 78));
+      rim.addColorStop(.34, hsl(-72, .88, 75));
+      rim.addColorStop(.46, "rgba(255,255,255,.74)");
+      rim.addColorStop(.64, hsl(160, .9, 72));
+      rim.addColorStop(.82, hsl(238, .88, 76));
+      rim.addColorStop(1, hsl(-126, .95, 74));
+      g.lineWidth = Math.max(3, r * .012);
+      g.strokeStyle = rim;
+      drawWavyCircle(g, x + wobble * .2, y, r * .988, 1 + growth * 3 + contactProgress * 28, 2 + growth + contactProgress * 2.4);
+      g.stroke();
+
+      g.globalCompositeOperation = "source-over";
+      g.lineWidth = Math.max(3, r * .01);
+      g.strokeStyle = "rgba(255, 255, 255, .92)";
+      drawWavyCircle(g, x + wobble * .2, y, r * 1.01, 1.2 + growth * 3.8 + contactProgress * 18, 2 + growth + contactProgress * 1.8);
+      g.stroke();
+      g.globalAlpha = .38 + growth * .18;
+      g.lineWidth = Math.max(1.8, r * .005);
+      g.strokeStyle = "rgba(255, 255, 255, .96)";
+      g.beginPath();
+      g.arc(x + wobble * .2, y, r * 1.014, 0, Math.PI * 2);
+      g.stroke();
+      g.globalCompositeOperation = "screen";
+
+      g.lineCap = "round";
+      g.lineWidth = Math.max(10, r * (.045 + contactProgress * .018));
+      g.globalAlpha = .36 + growth * .14 + contactProgress * .28;
+      g.strokeStyle = hsl(60, .72, 76);
+      g.beginPath();
+      g.arc(x, y, r * (.94 + Math.sin(state.phase * 4.5) * .018 * contactProgress), Math.PI * 1.05, Math.PI * 1.86);
+      g.stroke();
+
+      g.strokeStyle = hsl(-120, .62, 75);
+      g.beginPath();
+      g.arc(x, y, r * (.9 + Math.cos(state.phase * 4.1) * .02 * contactProgress), Math.PI * .08, Math.PI * .48);
+      g.stroke();
+
+      g.strokeStyle = hsl(128, .52, 78);
+      g.beginPath();
+      g.arc(x, y, r * (.86 + Math.sin(state.phase * 3.8 + 1.7) * .022 * contactProgress), Math.PI * .58, Math.PI * .9);
+      g.stroke();
+
+      g.lineWidth = Math.max(2, r * (.012 + contactProgress * .012));
+      g.globalAlpha = .34 + growth * .2 + contactProgress * .3;
+      for (let i = 0; i < 7; i += 1) {
+        const start = seededNoise(i + 2) * Math.PI * 2 + state.phase * (.18 + i * .02 + contactProgress * .16);
+        const length = .28 + seededNoise(i + 20) * .3 + contactProgress * .22;
+        g.strokeStyle = hsl(i * 54, .42, 76);
+        g.beginPath();
+        g.arc(
+          x + Math.sin(i + state.phase * 2.2) * r * (.014 + contactProgress * .018),
+          y + Math.cos(i * 1.7 + state.phase * 2) * r * (.014 + contactProgress * .018),
+          r * (.72 + i * .03 + Math.sin(state.phase * 3.5 + i) * .035 * contactProgress),
+          start,
+          start + length
+        );
+        g.stroke();
+      }
+
+      drawBubbleHighlights(g, x, y, r, growth, contactProgress, 0);
+
+      g.restore();
+
+      if (contact) {
+        drawInsideEnvironment(g, smoothstep(0, INSIDE_FADE_DURATION, state.hold), contactProgress, contactImageProgress);
+      }
+    }
+
+    function drawInsideEnvironment(g, insideFade, contactFade = 1, contactImageProgress = 0) {
+      drawInsideRefraction(g, insideFade * contactFade, source, 1 - contactImageProgress);
+      if (contactImageProgress > 0) drawInsideRefraction(g, insideFade * contactFade, contactSource, contactImageProgress);
+      drawInsideMembrane(g, insideFade * contactFade, contactFade);
+    }
+
+    function drawContactImageFade(g, progress) {
+      if (!contactSource.complete) return;
+      g.save();
+      g.globalCompositeOperation = "source-over";
+      g.globalAlpha = Math.min(.96, progress * .96);
+      drawCoverImage(g, contactSource);
+      g.restore();
+    }
+
+    function drawInsideRefraction(g, insideFade, image = source, weight = 1) {
+      if (!image.complete) return;
+      g.save();
+      g.globalCompositeOperation = "source-over";
+      g.globalAlpha = (.012 + insideFade * .063) * weight;
+      const driftX = Math.sin(state.phase * 1.4) * 10;
+      const driftY = Math.cos(state.phase * 1.1) * 8;
+      drawCoverImage(g, image, -8 + driftX, -6 + driftY, 1138, 1414);
+
+      g.globalAlpha = (.01 + insideFade * .055) * weight;
+      for (let i = 0; i < 4; i += 1) {
+        const y = 120 + i * 315 + Math.sin(state.phase * .9 + i) * 18;
+        const shift = Math.sin(state.phase * 1.2 + i * 1.7) * 14;
+        g.drawImage(image, 0, y, 1122, 210, shift, y - 4, 1122, 218);
+      }
+
+      g.globalCompositeOperation = "screen";
+      g.globalAlpha = (.02 + insideFade * .09) * weight;
+      g.fillStyle = "rgba(255,255,255,.72)";
+      g.fillRect(0, 0, 1122, 1402);
+      g.restore();
+    }
+
+    function drawWavyCircle(g, x, y, r, amount, speed) {
+      const steps = 180;
+      g.beginPath();
+      for (let i = 0; i <= steps; i += 1) {
+        const angle = i / steps * Math.PI * 2;
+        const ripple = Math.sin(angle * speed + state.phase * 4.8) * amount
+          + Math.sin(angle * (speed * .52 + 1.7) - state.phase * 3.4) * amount * .38;
+        const px = x + Math.cos(angle) * (r + ripple);
+        const py = y + Math.sin(angle) * (r + ripple);
+        if (i === 0) g.moveTo(px, py);
+        else g.lineTo(px, py);
+      }
+      g.closePath();
+    }
+
+    function drawInsideMembrane(g, insideFade, colorDrift = 1) {
+      g.save();
+      g.globalCompositeOperation = "screen";
+      const ripple = state.phase * .008;
+      const drift = colorDrift * insideFade;
+      const wash = g.createLinearGradient(
+        -260 + Math.sin(ripple) * 6 * drift,
+        Math.sin(ripple * 1.5) * 12 * drift,
+        1382 + Math.cos(ripple * .8) * 6 * drift,
+        1402 + Math.cos(ripple * 1.2) * 12 * drift
+      );
+      wash.addColorStop(0, insideHsl(24, .3, 75));
+      wash.addColorStop(.28, insideHsl(108, .26, 77));
+      wash.addColorStop(.56, insideHsl(202, .31, 75));
+      wash.addColorStop(.78, insideHsl(282, .25, 78));
+      wash.addColorStop(1, insideHsl(338, .29, 76));
+      g.fillStyle = wash;
+      g.globalAlpha = (.12 + insideFade * .7);
+      g.fillRect(0, 0, 1122, 1402);
+
+      const veil = g.createLinearGradient(
+        Math.sin(ripple * 1.2) * 4 * drift,
+        220 + Math.cos(ripple) * 14 * drift,
+        1122 + Math.cos(ripple * .9) * 4 * drift,
+        980 + Math.sin(ripple * .7) * 14 * drift
+      );
+      veil.addColorStop(0, "rgba(255,255,255,0)");
+      veil.addColorStop(.32, insideHsl(64, .2, 80));
+      veil.addColorStop(.5, insideHsl(188, .23, 78));
+      veil.addColorStop(.7, insideHsl(308, .18, 81));
+      veil.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = veil;
+      g.globalAlpha = (.06 + insideFade * .5);
+      g.fillRect(0, 0, 1122, 1402);
+
+      g.restore();
+    }
+
+    function drawBubbleHighlights(g, x, y, r, growth, contactProgress, insideFade = 0) {
+      g.save();
+      g.globalCompositeOperation = "screen";
+      const pattern = Math.floor(seededNoise(719) * 9);
+      const n = (offset) => seededNoise(720 + pattern * 41 + offset);
+      const fade = .9 - contactProgress * .18 + insideFade * .22;
+      const shimmer = 1 + Math.sin(state.phase * .8 + n(0) * Math.PI * 2) * .04;
+      g.globalAlpha = fade;
+      drawHighlight(g, x - r * (.45 + (n(1) - .5) * .08), y - r * (.58 + (n(2) - .5) * .08), r * (.21 + n(3) * .04) * shimmer, r * (.052 + n(4) * .018), -.44 + (n(5) - .5) * .42);
+      drawHighlight(g, x + r * (.55 + (n(6) - .5) * .08), y - r * (.34 + (n(7) - .5) * .08), r * (.15 + n(8) * .04), r * (.04 + n(9) * .016), .72 + (n(10) - .5) * .48);
+      drawHighlight(g, x + r * (.42 + (n(11) - .5) * .08), y + r * (.64 + (n(12) - .5) * .08), r * (.12 + n(13) * .035), r * (.028 + n(14) * .012), -.48 + (n(15) - .5) * .36);
+      drawHighlight(g, x - r * (.66 + (n(16) - .5) * .08), y + r * (.4 + (n(17) - .5) * .08), r * (.11 + n(18) * .032), r * (.024 + n(19) * .012), .5 + (n(20) - .5) * .42);
+
+      const coreAlpha = Math.min(1, (.34 + growth * .2 + contactProgress * .42 + insideFade * .12) * fade);
+      const coreLeftX = x - r * (.18 + n(21) * .06);
+      const coreLeftY = y + r * (.16 + (n(22) - .5) * .05);
+      const coreRightX = x + r * (.18 + n(26) * .06);
+      const coreRightY = y - r * (.16 + (n(27) - .5) * .05);
+      g.globalAlpha = Math.min(1, coreAlpha * 1.08);
+      drawHighlight(g, coreLeftX, coreLeftY, r * (.03 + n(23) * .02), r * (.092 + n(24) * .035), 2.18 + (n(25) - .5) * .18);
+      g.globalAlpha = Math.min(1, coreAlpha * (.9 + contactProgress * .14 + insideFade * .08));
+      drawHighlight(g, coreRightX, coreRightY, r * (.03 + n(28) * .02), r * (.088 + n(29) * .034), -.96 + (n(30) - .5) * .18);
+      g.restore();
+    }
+
+    function drawInterferenceBand(g, y, height, hueOffset, phase, spread, alpha, drift = 1) {
+      g.save();
+      g.filter = "blur(18px)";
+      const band = g.createLinearGradient(-120 - spread, y, 1242 + spread, y + height);
+      band.addColorStop(0, "rgba(255,255,255,0)");
+      band.addColorStop(.18, insideHsl(hueOffset + 18, alpha * .72, 78));
+      band.addColorStop(.43, insideHsl(hueOffset + 28, alpha, 76));
+      band.addColorStop(.66, insideHsl(hueOffset + 36, alpha * .86, 78));
+      band.addColorStop(.88, insideHsl(hueOffset + 22, alpha * .58, 80));
+      band.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = band;
+      g.beginPath();
+      const steps = 9;
+      for (let i = 0; i <= steps; i += 1) {
+        const p = i / steps;
+        const x = -160 + p * 1442;
+        const yy = y + Math.sin(p * Math.PI * 2 + phase) * 7 * drift + Math.sin(p * Math.PI * 4.2 - phase * .7) * 2 * drift;
+        if (i === 0) g.moveTo(x, yy);
+        else g.lineTo(x, yy);
+      }
+      for (let i = steps; i >= 0; i -= 1) {
+        const p = i / steps;
+        const x = -160 + p * 1442;
+        const yy = y + height + Math.sin(p * Math.PI * 2 + phase + .6) * 8 * drift + Math.sin(p * Math.PI * 4 - phase * .5) * 2 * drift;
+        g.lineTo(x, yy);
+      }
+      g.closePath();
+      g.globalAlpha = .9;
+      g.fill();
+      g.restore();
+    }
+
+    function drawEllipticHighlight(g, cx, cy, rx, ry, start, end, width, wave, phase, alpha) {
+      g.save();
+      g.lineCap = "round";
+      g.lineJoin = "round";
+      g.filter = "blur(10px)";
+      const sx = cx + Math.cos(start) * rx;
+      const sy = cy + Math.sin(start) * ry;
+      const ex = cx + Math.cos(end) * rx;
+      const ey = cy + Math.sin(end) * ry;
+      const gradient = g.createLinearGradient(sx, sy, ex, ey);
+      gradient.addColorStop(0, "rgba(255,255,255,0)");
+      gradient.addColorStop(.18, "rgba(255,255,255,.98)");
+      gradient.addColorStop(.5, "rgba(255,255,255,.92)");
+      gradient.addColorStop(.8, "rgba(255,255,255,.76)");
+      gradient.addColorStop(1, "rgba(255,255,255,0)");
+      g.strokeStyle = gradient;
+      g.globalAlpha = alpha;
+      g.lineWidth = width;
+      g.beginPath();
+      const steps = 18;
+      for (let i = 0; i <= steps; i += 1) {
+        const p = i / steps;
+        const angle = start + (end - start) * p;
+        const wobble = Math.sin(p * Math.PI * 2.2 + phase) * wave + Math.sin(p * Math.PI * 4.1 - phase * .6) * wave * .24;
+        const axisPull = Math.sin(p * Math.PI + phase * .4) * 8;
+        const px = cx + Math.cos(angle) * (rx + wobble) + axisPull;
+        const py = cy + Math.sin(angle) * (ry + wobble * .76);
+        if (i === 0) g.moveTo(px, py);
+        else g.lineTo(px, py);
+      }
+      g.stroke();
+
+      g.filter = "blur(18px)";
+      g.globalAlpha = alpha * .28;
+      g.lineWidth = width * 2.5;
+      g.stroke();
+      g.restore();
+    }
+
+    function drawSoftOval(g, x, y, w, h, rotation, color, alpha = .28) {
+      g.save();
+      g.translate(x, y);
+      g.rotate(rotation);
+      const shine = g.createRadialGradient(0, 0, 0, 0, 0, w);
+      shine.addColorStop(0, color);
+      shine.addColorStop(.62, color);
+      shine.addColorStop(1, "rgba(255,255,255,0)");
+      g.scale(1, h / w);
+      g.globalAlpha = alpha;
+      g.beginPath();
+      g.arc(0, 0, w, 0, Math.PI * 2);
+      g.fillStyle = shine;
+      g.fill();
+      g.restore();
+    }
+
+    function insideHsl(offset, alpha, light = 82) {
+      const hue = (seededNoise(offset + 17) * 360 + offset + 360) % 360;
+      return `hsla(${hue}, 70%, ${light}%, ${alpha})`;
+    }
+
+    function smoothstep(edge0, edge1, value) {
+      const t = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0)));
+      return t * t * (3 - 2 * t);
+    }
+
+    function drawBurst(g) {
+      const progress = Math.min(1, state.hold / 420);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const max = coverRadius();
+      const { x, y } = bubbleCenter(max);
+      g.save();
+      g.globalCompositeOperation = "screen";
+      g.lineCap = "round";
+      g.globalAlpha = (1 - progress) * .28;
+      const flash = g.createRadialGradient(x, y, max * .16, x, y, max * .9);
+      flash.addColorStop(0, "rgba(255,255,255,.42)");
+      flash.addColorStop(.58, "rgba(178,244,255,.16)");
+      flash.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = flash;
+      g.fillRect(0, 0, 1122, 1402);
+
+      for (let i = 0; i < 48; i += 1) {
+        const angle = seededNoise(i + 4) * Math.PI * 2;
+        const spread = max * (.48 + seededNoise(i + 30) * .65) + ease * 330;
+        const length = 42 + seededNoise(i + 80) * 155;
+        const sx = x + Math.cos(angle) * spread;
+        const sy = y + Math.sin(angle) * spread;
+        g.globalAlpha = (1 - progress) * (.5 + seededNoise(i + 8) * .5);
+        g.lineWidth = 2.5 + seededNoise(i + 50) * 8;
+        g.strokeStyle = i % 4 === 0 ? "rgba(255,255,255,.95)" : hsl(i * 33, .72, 78);
+        g.beginPath();
+        g.moveTo(sx, sy);
+        g.lineTo(sx + Math.cos(angle + .45) * length, sy + Math.sin(angle + .45) * length);
+        g.stroke();
+      }
+      g.globalAlpha = (1 - progress) * .6;
+      g.fillStyle = "rgba(255,255,255,.9)";
+      for (let i = 0; i < 36; i += 1) {
+        const angle = seededNoise(i + 120) * Math.PI * 2;
+        const d = max * seededNoise(i + 160) + ease * 250;
+        g.beginPath();
+        g.arc(x + Math.cos(angle) * d, y + Math.sin(angle) * d, 2.5 + seededNoise(i + 200) * 7, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.restore();
+    }
+
+    function drawHighlight(g, x, y, w, h, rotation) {
+      g.save();
+      g.translate(x, y);
+      g.rotate(rotation);
+      const shine = g.createRadialGradient(0, 0, 0, 0, 0, w);
+      shine.addColorStop(0, "rgba(255,255,255,.92)");
+      shine.addColorStop(.58, "rgba(255,255,255,.74)");
+      shine.addColorStop(1, "rgba(255,255,255,0)");
+      g.scale(1, h / w);
+      g.beginPath();
+      g.arc(0, 0, w, 0, Math.PI * 2);
+      g.fillStyle = shine;
+      g.fill();
+      g.restore();
+    }
+
+    function drawRecordingFrame() {
+      if (!source.complete) return;
+      recordCtx.setTransform(1, 0, 0, 1, 0, 0);
+      recordCtx.clearRect(0, 0, 1122, 1402);
+      drawSceneBackground(recordCtx);
+      drawBubble(recordCtx);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, 1122, 1402);
+      drawSceneBackground(ctx);
+      drawBubble(ctx);
+      drawRecordingFrame();
+      captureGifFrame();
+    }
+
+    function tick(time) {
+      if (!state.playing) return;
+      if (!state.lastTime) state.lastTime = time;
+      const delta = Math.min(48, time - state.lastTime);
+      state.lastTime = time;
+      if (state.mode !== "intro" && state.mode !== "clear") state.phase += delta / 780;
+      const max = coverRadius();
+      if (state.mode === "intro") {
+        state.hold += delta;
+        if (state.hold >= STILL_DURATION) {
+          state.mode = "grow";
+          state.hold = 0;
+        }
+      } else if (state.mode === "burst") {
+        state.hold += delta;
+        if (state.hold >= 420) {
+          state.mode = "clear";
+          state.hold = 0;
+        }
+      } else if (state.mode === "clear") {
+        state.hold += delta;
+        if (state.hold >= STILL_DURATION) reset();
+      } else if (state.mode === "contact") {
+        state.hold += delta;
+        state.radius = state.contactRadius || state.radius;
+        if (state.hold >= CONTACT_HOLD_DURATION) {
+          state.mode = "burst";
+          state.hold = 0;
+        }
+      } else if (state.radius >= max) {
+        state.mode = "contact";
+        state.contactRadius = max * CONTACT_RADIUS_SCALE;
+        state.radius = state.contactRadius;
+        state.hold = 0;
+      } else {
+        const progress = state.radius / max;
+        const acceleration = .42 + Math.pow(smoothstep(.22, .78, progress), 1.45) * 1.45;
+        state.radius = Math.min(max, state.radius + Number(controls.speed.value) * acceleration * delta / 1000);
+        if (state.radius >= max * CONTACT_START_RATIO) {
+          state.mode = "contact";
+          state.contactRadius = max * CONTACT_RADIUS_SCALE;
+          state.radius = state.contactRadius;
+          state.hold = 0;
+        }
+      }
+      draw();
+      requestAnimationFrame(tick);
+    }
+
+    function setRecording(next) {
+      if (next) {
+        if (state.downloadUrl) URL.revokeObjectURL(state.downloadUrl);
+        state.downloadUrl = "";
+        controls.downloadLink.hidden = true;
+        controls.downloadLink.removeAttribute("href");
+        drawRecordingFrame();
+        if (!("MediaRecorder" in window) || !recordCanvas.captureStream) {
+          startGifRecording();
+          setPlaying(true);
+          updateRecordButton(true);
+          return;
+        }
+        state.chunks = [];
+        const stream = recordCanvas.captureStream(30);
+        const recorderType = preferredRecorderType();
+        const options = recorderType.mimeType ? { mimeType: recorderType.mimeType } : undefined;
+        state.recorder = new MediaRecorder(stream, options);
+        state.recorder.addEventListener("dataavailable", (event) => {
+          if (event.data.size > 0) state.chunks.push(event.data);
+        });
+        state.recorder.addEventListener("stop", () => {
+          const type = state.recorder.mimeType || recorderType.mimeType || "video/webm";
+          const blob = new Blob(state.chunks, { type });
+          const extension = type.includes("mp4") ? "mp4" : "webm";
+          downloadBlob(blob, `bubble-seed-${controls.seed.value || 1}.${extension}`);
+        });
+        state.recorder.start();
+        setPlaying(true);
+      } else if (state.recorder && state.recorder.state !== "inactive") {
+        state.recorder.stop();
+      } else if (state.gifRecording) {
+        saveGifRecording();
+      }
+      updateRecordButton(next);
+    }
+
+    function preferredRecorderType() {
+      const candidates = [
+        "video/mp4;codecs=avc1.42E01E",
+        "video/mp4;codecs=h264",
+        "video/mp4",
+        "video/webm;codecs=vp9",
+        "video/webm",
+      ];
+      const mimeType = candidates.find((type) => MediaRecorder.isTypeSupported(type));
+      return { mimeType };
+    }
+
+    function isRecording() {
+      return (state.recorder && state.recorder.state === "recording") || state.gifRecording;
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      state.downloadUrl = url;
+      controls.downloadLink.href = url;
+      controls.downloadLink.download = filename;
+      controls.downloadLink.textContent = "保存";
+      controls.downloadLink.hidden = false;
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.rel = "noopener";
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        link.remove();
+      }, 1200);
+    }
+
+    function updateRecordButton(recording) {
+      controls.record.classList.toggle("recording", recording);
+      controls.record.setAttribute("aria-label", recording ? "録画停止" : "録画開始");
+      controls.recordIcon.innerHTML = recording
+        ? '<path d="M8 8h8v8H8V8Z"/>'
+        : '<path d="M7 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Zm10 3.2-3.2 2.8L17 14.8V9.2Z"/>';
+    }
+
+    function startGifRecording() {
+      state.gifFrames = [];
+      state.gifRecording = true;
+      state.lastGifFrame = 0;
+      captureGifFrame(true);
+    }
+
+    function captureGifFrame(force = false) {
+      if (!state.gifRecording) return;
+      const now = performance.now();
+      if (!force && now - state.lastGifFrame < 100) return;
+      state.lastGifFrame = now;
+      const gifCanvas = document.createElement("canvas");
+      gifCanvas.width = 480;
+      gifCanvas.height = 600;
+      const gifCtx = gifCanvas.getContext("2d", { willReadFrequently: true });
+      gifCtx.drawImage(recordCanvas, 0, 0, gifCanvas.width, gifCanvas.height);
+      const data = gifCtx.getImageData(0, 0, gifCanvas.width, gifCanvas.height).data;
+      const indices = new Uint8Array(gifCanvas.width * gifCanvas.height);
+      for (let sourceIndex = 0, targetIndex = 0; sourceIndex < data.length; sourceIndex += 4, targetIndex += 1) {
+        indices[targetIndex] = ((data[sourceIndex] >> 5) << 5) | ((data[sourceIndex + 1] >> 5) << 2) | (data[sourceIndex + 2] >> 6);
+      }
+      state.gifFrames.push(indices);
+      if (state.gifFrames.length > 180) saveGifRecording();
+    }
+
+    function saveGifRecording() {
+      state.gifRecording = false;
+      updateRecordButton(false);
+      if (state.gifFrames.length === 0) return;
+      const blob = new Blob([encodeGif(state.gifFrames, 480, 600, 10)], { type: "image/gif" });
+      downloadBlob(blob, `bubble-seed-${controls.seed.value || 1}.gif`);
+    }
+
+    function encodeGif(frames, width, height, fps) {
+      const bytes = [];
+      const write = (...values) => bytes.push(...values);
+      const text = (value) => write(...[...value].map((char) => char.charCodeAt(0)));
+      const word = (value) => write(value & 255, (value >> 8) & 255);
+
+      text("GIF89a");
+      word(width);
+      word(height);
+      write(0xf7, 0, 0);
+      for (let r = 0; r < 8; r += 1) {
+        for (let g = 0; g < 8; g += 1) {
+          for (let b = 0; b < 4; b += 1) {
+            write(Math.round(r * 255 / 7), Math.round(g * 255 / 7), Math.round(b * 255 / 3));
+          }
+        }
+      }
+      write(0x21, 0xff, 0x0b);
+      text("NETSCAPE2.0");
+      write(3, 1);
+      word(0);
+      write(0);
+
+      const delay = Math.max(2, Math.round(100 / fps));
+      frames.forEach((frame) => {
+        write(0x21, 0xf9, 4, 4);
+        word(delay);
+        write(0, 0);
+        write(0x2c);
+        word(0);
+        word(0);
+        word(width);
+        word(height);
+        write(0);
+        write(8);
+        const image = lzwEncode(frame);
+        for (let i = 0; i < image.length; i += 255) {
+          const block = image.slice(i, i + 255);
+          write(block.length, ...block);
+        }
+        write(0);
+      });
+      write(0x3b);
+      return new Uint8Array(bytes);
+    }
+
+    function lzwEncode(indices) {
+      const clear = 256;
+      const end = 257;
+      let nextCode = 258;
+      let codeSize = 9;
+      const bytes = [];
+      let current = 0;
+      let bitCount = 0;
+      const dict = new Map();
+
+      function writeCode(code) {
+        current |= code << bitCount;
+        bitCount += codeSize;
+        while (bitCount >= 8) {
+          bytes.push(current & 255);
+          current >>= 8;
+          bitCount -= 8;
+        }
+      }
+
+      function resetDict() {
+        dict.clear();
+        nextCode = 258;
+        codeSize = 9;
+      }
+
+      writeCode(clear);
+      let phrase = String(indices[0]);
+      let phraseCode = indices[0];
+      for (let i = 1; i < indices.length; i += 1) {
+        const value = indices[i];
+        const key = `${phrase},${value}`;
+        const code = dict.get(key);
+        if (code !== undefined) {
+          phrase = key;
+          phraseCode = code;
+        } else {
+          writeCode(phraseCode);
+          if (nextCode < 4096) {
+            dict.set(key, nextCode);
+            nextCode += 1;
+            if (nextCode === (1 << codeSize) && codeSize < 12) codeSize += 1;
+          } else {
+            writeCode(clear);
+            resetDict();
+          }
+          phrase = String(value);
+          phraseCode = value;
+        }
+      }
+      writeCode(phraseCode);
+      writeCode(end);
+      if (bitCount > 0) bytes.push(current & 255);
+      return bytes;
+    }
+
+    app.addEventListener("pointerdown", (event) => {
+      if (event.target.closest(".controls")) return;
+      const rect = app.getBoundingClientRect();
+      state.center.x = (event.clientX - rect.left) / rect.width * 1122;
+      state.center.y = (event.clientY - rect.top) / rect.height * 1402;
+      reset();
+      setPlaying(true);
+    });
+
+    function loadUserImage(input, image, key, updateScene = false) {
+      const [file] = input.files || [];
+      if (!file) return;
+      if (state[key]) URL.revokeObjectURL(state[key]);
+      const url = URL.createObjectURL(file);
+      state[key] = url;
+      image.addEventListener("load", () => {
+        if (updateScene) {
+          scene.src = url;
+          scene.style.objectFit = "cover";
+          scene.style.objectPosition = "center center";
+        }
+        draw();
+      }, { once: true });
+      image.src = url;
+      if (updateScene) {
+        scene.src = url;
+        scene.style.objectFit = "cover";
+        scene.style.objectPosition = "center center";
+      }
+    }
+
+    controls.baseImage.addEventListener("change", () => {
+      loadUserImage(controls.baseImage, source, "baseObjectUrl", true);
+      reset();
+    });
+
+    controls.contactImage.addEventListener("change", () => {
+      loadUserImage(controls.contactImage, contactSource, "contactObjectUrl");
+      reset();
+    });
+
+    controls.toggle.addEventListener("click", () => setPlaying(!state.playing));
+    controls.reset.addEventListener("click", reset);
+    controls.record.addEventListener("click", () => setRecording(!isRecording()));
+    Object.values(controls).forEach((control) => {
+      if (control instanceof HTMLInputElement && control.type !== "file") control.addEventListener("input", () => {
+        state.hold = 0;
+        draw();
+      });
+    });
+
+    source.addEventListener("load", draw);
+    window.addEventListener("resize", resize);
+    resize();
+    setPlaying(true);
+  </script>
+</body>
+</html>
